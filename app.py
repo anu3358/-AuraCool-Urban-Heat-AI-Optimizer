@@ -1,4 +1,4 @@
-# app.py - FIXED MODEL NAME VERSION
+# app.py - FIXED MODEL VERSION 1.0-PRO
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
@@ -27,7 +27,6 @@ except (FileNotFoundError, KeyError):
 if gemini_api_key:
     genai.configure(api_key=gemini_api_key)
 else:
-    # We warn but don't crash; the AI tab will just show an error if used
     pass
 
 st.set_page_config(
@@ -167,7 +166,7 @@ try:
     )
 
     layers_needed, paint_color = estimate_paint_layers_and_color(
-        target_temp_drop_c=reduction
+        target_temp_drop_c=reduction,
     )
 
     # ============ TOP METRICS ============
@@ -703,8 +702,8 @@ OUTPUT FORMAT:
 [Watering needs]
                         """
                         
-                        # Use 'gemini-pro' for maximum compatibility
-                        model = genai.GenerativeModel('gemini-pro')
+                        # Use 'gemini-1.0-pro' which is universally available
+                        model = genai.GenerativeModel('gemini-1.0-pro')
                         response = model.generate_content(prompt)
                         
                         st.markdown(response.text)
@@ -713,6 +712,7 @@ OUTPUT FORMAT:
                         
                     except Exception as e:
                         st.error(f"❌ Gemini API Error: {e}")
+                        st.info("Try checking your API key quota or enable the 'Generative Language API' in Google Cloud Console.")
 
         st.markdown("---")
         with st.expander("📚 Research: Trees vs Sunscreen"):
