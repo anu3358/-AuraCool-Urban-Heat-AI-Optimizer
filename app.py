@@ -1,20 +1,28 @@
-# app.py - COMPLETE FINAL VERSION WITH PURE RED→GREEN COLOR CHANGE
+# app.py - COMPLETE FINAL VERSION WITH GEMINI AI TAB
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
 import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
+import os
+import google.generativeai as genai  # NEW: Google Gemini Import
 
 from data_engine import load_thermal_data, get_city_data, get_baseline_stats
 from ml_model import (
     apply_intervention_to_dataframe,
     get_intervention_summary,
-    estimate_trees_required,          # NEW
-    estimate_paint_layers_and_color,  # NEW
+    estimate_trees_required,
+    estimate_paint_layers_and_color,
 )
 from agent_logic import get_ai_recommendation
 from config import DEFAULT_CITIES
+
+# ============ GEMINI CONFIGURATION ============
+# Configure Gemini API Key from environment variable or secrets
+gemini_api_key = os.getenv("GEMINI_API_KEY")
+if gemini_api_key:
+    genai.configure(api_key=AIzaSyDBiPByqOGJVSDoGC5hoapqTTGp5pKg5oQ)
 
 st.set_page_config(
     page_title="AuraCool — Urban Heat AI",
@@ -193,7 +201,7 @@ try:
         )
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ============ NEW: TREES + PAINT RECOMMENDATION CARDS ============
+    # ============ TREES + PAINT RECOMMENDATION CARDS ============
     st.markdown("### 🌳 Detailed Cooling Interventions")
 
     col_trees, col_paint = st.columns(2)
@@ -260,9 +268,16 @@ try:
         </div>
         """, unsafe_allow_html=True)
 
-    # ============ VISUALIZATION TABS ============
-    tab_intro, tab1, tab2, tab3, tab4 = st.tabs(
-        ["🌍 Problem & Solution", "🗺️ 3D Heat Map", "📊 Temperature Distribution", "🎯 Intervention Impact", "🤖 AI Strategy"]
+    # ============ VISUALIZATION TABS (ADDED NEW TAB AT END) ============
+    tab_intro, tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        [
+            "🌍 Problem & Solution", 
+            "🗺️ 3D Heat Map", 
+            "📊 Temperature Distribution", 
+            "🎯 Intervention Impact", 
+            "🤖 AI Strategy",
+            "🌳 AI Tree Advisor"  # NEW TAB
+        ]
     )
 
     # ========== TAB 0: PROBLEM & SOLUTION ==========
@@ -604,6 +619,104 @@ try:
                 file_name=f"AuraCool_{city_name}_Strategy.txt",
                 mime="text/plain",
             )
+
+    # ========== TAB 5: AI TREE ADVISOR (NEW GEMINI TAB) ==========
+    with tab5:
+        st.subheader("🌳 AI Tree Advisor (Powered by Gemini)")
+        st.write("Get personalized tree recommendations based on **temperature control**, **UV protection**, and **planting seasons**.")
+        
+        # Input Section
+        col_t1, col_t2, col_t3 = st.columns(3)
+        
+        with col_t1:
+            user_climate = st.selectbox(
+                "🌍 Select Your Climate Zone",
+                [
+                    "Tropical (Hot & Humid)",
+                    "Arid (Hot & Dry)",
+                    "Temperate (Moderate)",
+                    "Continental (Cold Winters)",
+                    "Mediterranean (Mild & Dry)"
+                ],
+                index=0
+            )
+        
+        with col_t2:
+            user_concern = st.selectbox(
+                "🎯 Priority",
+                [
+                    "Temperature Cooling (Primary)",
+                    "UV Protection (Sun Safety)",
+                    "Mixed (Both)",
+                ],
+                index=0
+            )
+        
+        with col_t3:
+            area_size = st.selectbox(
+                "📏 Available Space",
+                [
+                    "Small (< 20m²)",
+                    "Medium (20-50m²)",
+                    "Large (50-100m²)",
+                    "Very Large (> 100m²)"
+                ],
+                index=0
+            )
+        
+        st.markdown("---")
+        
+        # Generate Gemini Recommendation
+        if st.button("🤖 Get AI Tree Recommendation", type="primary", use_container_width=True):
+            if not gemini_api_key:
+                st.error("❌ Gemini API key not configured. Please set GEMINI_API_KEY in environment variables.")
+                st.info("Get your free key: [Google AI Studio](https://aistudio.google.com/app/apikey)")
+            else:
+                with st.spinner("🔄 Analyzing best trees for your location using Gemini AI..."):
+                    try:
+                        # Gemini Prompt
+                        prompt = f"""
+You are an expert urban arborist and climate scientist.
+Based on the user's inputs, provide top 3 tree recommendations.
+
+DETAILS:
+- Climate: {user_climate}
+- Priority: {user_concern}
+- Space: {area_size}
+
+OUTPUT FORMAT:
+## 🌲 Top 3 Recommended Trees
+[List 3 specific trees with Scientific Name, Cooling Capacity (deg C), UV Protection Factor (SPF equiv), and Best Season to Plant]
+
+## ☀️ Trees vs Sunscreen for UV
+[Compare tree shade vs sunscreen effectiveness. Is tree shade better? Why?]
+
+## 🌱 Planting Advice
+[3 bullet points on how to plant in {user_climate}]
+
+## 💧 Maintenance
+[Watering needs]
+                        """
+                        
+                        # Call Gemini
+                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        response = model.generate_content(prompt)
+                        
+                        st.markdown(response.text)
+                        
+                        st.success("✅ **Quick Tip:** Planting native trees ensures better survival rates and requires less water!")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Gemini API Error: {e}")
+
+        st.markdown("---")
+        with st.expander("📚 Research: Trees vs Sunscreen"):
+            st.markdown("""
+            **Did you know?**
+            - 🌳 **Tree Shade:** Blocks 95-98% of UV radiation (SPF ~10-50 depending on density).
+            - 🧴 **Sunscreen:** SPF 50 blocks 98% of UV.
+            - **Verdict:** Dense tree shade offers similar protection to high SPF sunscreen, but without chemicals and with added cooling!
+            """)
 
     st.markdown("---")
     st.markdown(
