@@ -19,10 +19,17 @@ from agent_logic import get_ai_recommendation
 from config import DEFAULT_CITIES
 
 # ============ GEMINI CONFIGURATION ============
-# Configure Gemini API Key from environment variable or secrets
-gemini_api_key = os.getenv("GEMINI_API_KEY")
+# FIXED: Try st.secrets first (Streamlit Cloud), then environment variable (local)
+try:
+    gemini_api_key = st.secrets["GEMINI_API_KEY"]
+except (FileNotFoundError, KeyError):
+    gemini_api_key = os.getenv("GEMINI_API_KEY")
+
 if gemini_api_key:
-    genai.configure(api_key=AIzaSyDBiPByqOGJVSDoGC5hoapqTTGp5pKg5oQ)
+    genai.configure(api_key=gemini_api_key)
+else:
+    # We warn, but don't crash the whole app if key is missing
+    pass
 
 st.set_page_config(
     page_title="AuraCool — Urban Heat AI",
@@ -669,8 +676,7 @@ try:
         # Generate Gemini Recommendation
         if st.button("🤖 Get AI Tree Recommendation", type="primary", use_container_width=True):
             if not gemini_api_key:
-                st.error("❌ Gemini API key not configured. Please set GEMINI_API_KEY in environment variables.")
-                st.info("Get your free key: [Google AI Studio](https://aistudio.google.com/app/apikey)")
+                st.error("❌ Gemini API key not configured. Please set GEMINI_API_KEY in Streamlit Secrets.")
             else:
                 with st.spinner("🔄 Analyzing best trees for your location using Gemini AI..."):
                     try:
