@@ -1,4 +1,4 @@
-# agent_logic.py
+# agent_logic.py - COMPLETE VERSION
 
 def classify_risk(temp_c):
     """Classify thermal risk based on temperature."""
@@ -36,6 +36,20 @@ def get_ai_recommendation(
     """
     Generate comprehensive AI strategy report for a city.
     This is the 'agentic' layer that converts data into actionable policy.
+    
+    Args:
+        city_name: Name of the city
+        base_temp: Baseline temperature (°C)
+        new_temp: Optimized temperature (°C)
+        reduction: Temperature reduction (°C)
+        budget_musd: Budget in Million USD
+        urban_hotspot_pct: Percentage of hotspot areas
+        estimated_trees: Optional - number of trees required
+        layers_needed: Optional - number of paint layers
+        paint_color: Optional - paint color recommendation
+    
+    Returns:
+        Markdown formatted strategy report string
     """
     threat_level, health_msg = classify_risk(base_temp)
 
@@ -97,10 +111,12 @@ Immediate action is required. With an investment of approximately **${budget_mus
    - {roof_plan}
    - Expand tree canopy along heat-intense transit corridors and pedestrian plazas
    - Plant 50,000+ fast-growing shade trees in underserved districts  
-{tree_line}2. **Cool Pavements & Surfaces:**
+{tree_line}
+2. **Cool Pavements & Surfaces:**
    - Paint roads and parking lots with high-albedo reflective coatings
    - Target at least 15% of paved surfaces for reflectivity upgrade  
-{paint_line}3. **Cooling Centers:**
+{paint_line}
+3. **Cooling Centers:**
    - Deploy mobile cooling buses and shaded pop-up corridors during red-alert heat days
    - Retrofit public buildings with passive cooling (green walls, water features)
 
