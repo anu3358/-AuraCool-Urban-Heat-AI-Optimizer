@@ -1,14 +1,26 @@
-# ml_model.py - COMPLETE VERSION WITH ALL FUNCTIONS
+# ml_model.py - FINAL CORRECTED VERSION
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import GradientBoostingRegressor
 import streamlit as st
 
+# ==========================================================
+# ML MODEL (Baseline Temperature Estimator)
+# ==========================================================
+
 @st.cache_resource
 def train_heat_predictor():
-    """Train a simple regressor for temperature prediction."""
+    """
+    Train a small regression model that learns
+    how urban form affects surface temperature.
+
+    NOTE:
+    This model is intentionally lightweight and
+    serves as a baseline estimator — NOT the
+    intervention engine.
+    """
     X = np.array([
-        [0.05, 0.05, 0.90],
+        [0.05, 0.05, 0.90],  # low vegetation, low reflectivity, high density
         [0.10, 0.10, 0.80],
         [0.30, 0.20, 0.60],
         [0.50, 0.30, 0.40],
@@ -16,117 +28,112 @@ def train_heat_predictor():
         [0.85, 0.50, 0.15],
     ])
     y = np.array([46, 42, 38, 34, 30, 27])
-    model = GradientBoostingRegressor(random_state=42)
+
+    model = GradientBoostingRegressor(
+        n_estimators=200,
+        learning_rate=0.05,
+        max_depth=3,
+        random_state=42
+    )
     model.fit(X, y)
     return model
 
 
+# ==========================================================
+# INTERVENTION ENGINE (MAIN FIX IS HERE)
+# ==========================================================
+
 def apply_intervention_to_dataframe(df, green_increase_pct, refl_increase_pct):
     """
-    Apply intervention to a city's thermal dataframe.
-    
-    Logic:
-    - Pixels with high NDBI (built-up) get more temperature reduction from reflectivity
-    - Vegetation intervention helps more in dense areas
+    Apply urban cooling interventions to thermal data.
+
+    FIXED LOGIC:
+    - Cooling is applied PER 1% increase (not per 100%)
+    - Built-up areas (high NDBI) respond more strongly
+    - Results now produce visible, realistic deltas
     """
+
     df_modified = df.copy()
-    
-    # Vegetation intervention: trees cool nearby areas
-    # Effect: -0.15°C per 1% vegetation increase, more in built-up areas
-    veg_effect = (green_increase_pct / 100.0) * 0.15 * (df['ndbi'] / (df['ndbi'].max() + 0.01))
-    
-    # Reflectivity intervention: white roofs
-    # Effect: -0.20°C per 1% reflectivity increase in built-up areas
-    refl_effect = (refl_increase_pct / 100.0) * 0.20 * (df['ndbi'] / (df['ndbi'].max() + 0.01))
-    
-    # Combined effect (capped at -3°C max reduction per pixel)
+
+    # Normalize NDBI to 0–1 range
+    ndbi_norm = df['ndbi'] / (df['ndbi'].max() + 1e-6)
+
+    # Cooling coefficients (°C per 1% increase)
+    # These are calibrated for visible but realistic city-scale impact
+    VEG_COOLING_PER_PCT = 0.04    # trees, parks, green roofs
+    REFL_COOLING_PER_PCT = 0.07   # cool roofs, pavements
+
+    # Compute effects
+    veg_effect = green_increase_pct * VEG_COOLING_PER_PCT * ndbi_norm
+    refl_effect = refl_increase_pct * REFL_COOLING_PER_PCT * ndbi_norm
+
+    # Combine and cap cooling (physics + realism constraint)
     total_reduction = np.minimum(veg_effect + refl_effect, 3.0)
-    
-    df_modified['temperature_c'] = df['temperature_c'] - total_reduction
+
+    # Apply cooling
     df_modified['temperature_reduction'] = total_reduction
-    
+    df_modified['temperature_c'] = df['temperature_c'] - total_reduction
+
     return df_modified
 
 
+# ==========================================================
+# SUMMARY METRICS
+# ==========================================================
+
 def get_intervention_summary(df_original, df_modified):
-    """Compare before/after temperatures."""
+    """
+    Compute before/after metrics for dashboard display.
+    """
     original_mean = df_original['temperature_c'].mean()
     modified_mean = df_modified['temperature_c'].mean()
-    reduction = original_mean - modified_mean
-    
+
     return {
-        'base_temp': original_mean,
-        'new_temp': modified_mean,
-        'reduction': reduction,
-        'max_reduction': df_modified['temperature_reduction'].max(),
+        'base_temp': round(original_mean, 2),
+        'new_temp': round(modified_mean, 2),
+        'reduction': round(original_mean - modified_mean, 2),
+        'max_reduction': round(df_modified['temperature_reduction'].max(), 2),
     }
 
 
-# ============ NEW FUNCTIONS FOR app.py ============
+# ==========================================================
+# TREE ESTIMATION (POLICY / PLANNING MODULE)
+# ==========================================================
 
 def estimate_trees_required(area_km2: float, target_temp_drop_c: float) -> int:
     """
-    Estimate number of trees needed to achieve target temperature reduction.
-    
-    Based on research:
-    - 1 mature tree = ~1.5-2.0°C cooling effect (local area ~100m²)
-    - Urban tree density = ~500-1000 trees per km² (healthy cities)
-    - Each 1°C reduction city-wide = ~1000 trees per km² of priority area
-    
-    Args:
-        area_km2: Area of city (km²) where intervention applies
-        target_temp_drop_c: Target temperature reduction (°C)
-    
-    Returns:
-        Estimated number of trees required
+    Estimate number of trees required for city-scale cooling.
+
+    Heuristic:
+    ~1000 trees / km² / °C (dense priority zones)
     """
     if target_temp_drop_c <= 0:
         return 0
-    
-    # Heuristic: ~1000 trees per km² per 1°C reduction
-    # (accounts for mature canopy coverage, local clustering effects)
-    trees_per_km2_per_degree = 1000
-    
-    estimated_trees = int(area_km2 * target_temp_drop_c * trees_per_km2_per_degree)
-    
-    return estimated_trees
 
+    TREES_PER_KM2_PER_DEGREE = 1000
+    return int(area_km2 * target_temp_drop_c * TREES_PER_KM2_PER_DEGREE)
+
+
+# ==========================================================
+# COOL ROOF ESTIMATION
+# ==========================================================
 
 def estimate_paint_layers_and_color(target_temp_drop_c: float) -> tuple:
     """
-    Estimate cool-roof paint layers and color recommendation based on cooling target.
-    
-    Based on research:
-    - High-albedo white paint (95% reflectance) = ~0.8-1.2°C cooling per layer
-    - Multiple coats improve durability and effectiveness
-    - Color progression: Pure White → Off-White → Light Gray (based on intensity needed)
-    
-    Args:
-        target_temp_drop_c: Target temperature reduction (°C)
-    
-    Returns:
-        Tuple of (num_layers: int, color_name: str)
+    Estimate cool-roof paint layers and color type.
     """
+
     if target_temp_drop_c <= 0:
         return 0, "No coating required"
-    
-    # Cooling per coat: ~0.8°C per layer
-    cooling_per_layer = 0.8
-    
-    # Calculate layers needed
-    layers_needed = max(0, int(np.ceil(target_temp_drop_c / cooling_per_layer)))
-    
-    # Cap at 3 layers (diminishing returns + cost)
+
+    COOLING_PER_LAYER = 0.8  # °C per layer
+    layers_needed = int(np.ceil(target_temp_drop_c / COOLING_PER_LAYER))
     layers_needed = min(layers_needed, 3)
-    
-    # Color recommendation based on intensity
+
     color_map = {
-        0: "No coating required",
-        1: "High-Albedo White (95% reflectance, Solar Reflectance Index ~105)",
-        2: "Off-White (90% reflectance, SRI ~95) with primer coat",
-        3: "Pure White + Double Layer (98% reflectance, SRI ~115+)",
+        1: "High-Albedo White (95% reflectance, SRI ≈105)",
+        2: "Off-White + Primer (90% reflectance, SRI ≈95)",
+        3: "Pure White Triple-Coat (98% reflectance, SRI ≈115+)",
     }
-    
-    color_name = color_map.get(layers_needed, "Consult engineer")
-    
-    return layers_needed, color_name
+
+    return layers_needed, color_map.get(layers_needed, "Engineering review required")
